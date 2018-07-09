@@ -1,23 +1,14 @@
 package fr.inria.astor.core.faultlocalization.cocospoon;
 
-import java.io.File;
-import java.net.MalformedURLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import org.apache.log4j.Logger;
-
 import fil.iagl.opl.cocospoon.processors.WatcherProcessor;
 import fr.inria.astor.core.entities.ProgramVariant;
 import fr.inria.astor.core.faultlocalization.FaultLocalizationResult;
 import fr.inria.astor.core.faultlocalization.FaultLocalizationStrategy;
-import fr.inria.astor.core.faultlocalization.cocospoon.code.SourceLocation;
 import fr.inria.astor.core.faultlocalization.cocospoon.code.StatementSourceLocation;
+import fr.inria.astor.core.faultlocalization.cocospoon.metrics.Metric;
+import fr.inria.astor.core.faultlocalization.cocospoon.metrics.Naish1;
 import fr.inria.astor.core.faultlocalization.cocospoon.metrics.Ochiai;
-import fr.inria.astor.core.faultlocalization.cocospoon.testrunner.TestResult;
+import fr.inria.astor.core.faultlocalization.cocospoon.metrics.Tarantula;
 import fr.inria.astor.core.faultlocalization.entity.SuspiciousCode;
 import fr.inria.astor.core.manipulation.MutationSupporter;
 import fr.inria.astor.core.manipulation.bytecode.classloader.BytecodeClassLoader;
@@ -26,10 +17,19 @@ import fr.inria.astor.core.manipulation.bytecode.entities.CompilationResult;
 import fr.inria.astor.core.setup.ConfigurationProperties;
 import fr.inria.astor.core.setup.ProjectRepairFacade;
 import fr.inria.astor.util.Converters;
+import org.apache.log4j.Logger;
 import spoon.processing.ProcessInterruption;
 import spoon.processing.ProcessingManager;
 import spoon.reflect.declaration.CtType;
 import spoon.support.RuntimeProcessingManager;
+
+import java.io.File;
+import java.net.MalformedURLException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 
@@ -58,27 +58,34 @@ public class CocoFaultLocalization implements FaultLocalizationStrategy {
 		BytecodeClassLoader customClassLoader = createClassLoader(cresults, project);
 
 		// call cocoa with tests
+		List<Metric> metrics = new ArrayList<>(4);
+		metrics.add(new Ochiai());
+		metrics.add(new Tarantula());
+		metrics.add(new Naish1());
 
-		CocoSpoonEngineFaultLocalizer coco4Astor = new CocoSpoonEngineFaultLocalizer(new Ochiai());
+		CocoSpoonEngineFaultLocalizer coco4Astor = new CocoSpoonEngineFaultLocalizer(metrics);
 		// Get Test
 		List<String> testregression = project.getProperties().getRegressionTestCases();
 		testregression.toArray(new String[0]);
 		coco4Astor.runTests(testregression.toArray(new String[0]), customClassLoader, project);
 
 		// Collecting failing test cases
-		List<String> testsfailing = coco4Astor.getResultsPerNameOfTest().entrySet().stream()
-				.filter(e -> e.getValue() == false).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()))
-				.keySet().stream().collect(Collectors.toList());
+		List<String> testsfailing = new ArrayList<>(coco4Astor.getResultsPerNameOfTest().entrySet()
+				.stream()
+				.filter(e -> !e.getValue())
+				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))
+				.keySet()
+		);
 
-		Map<SourceLocation, List<TestResult>> stc = coco4Astor.getTestListPerStatement();
-		List<? extends StatementSourceLocation> suspstatement = coco4Astor.getStatements();
+		List<? extends StatementSourceLocation> suspiciousStatements =
+				coco4Astor.getStatementsSortedBySuspiciousness();
 
 		MutationSupporter.cleanFactory();
 
 		Double thr = ConfigurationProperties.getPropertyDouble("flthreshold");
 
 		List<SuspiciousCode> candidates = new ArrayList<>();
-		for (StatementSourceLocation statementSourceLocation : suspstatement) {
+		for (StatementSourceLocation statementSourceLocation : suspiciousStatements) {
 			if ((!ConfigurationProperties.getPropertyBool("limitbysuspicious")
 					|| (statementSourceLocation.getSuspiciousness() >= thr))) {
 				SuspiciousCode spc = new SuspiciousCode(statementSourceLocation.getLocation().getRootClassName(), null,
