@@ -82,17 +82,16 @@ public class CocoSpoonEngineFaultLocalizer {
 
 	List<StatementSourceLocation> getStatementsSortedBySuspiciousness() {
 
-	    List<MetricParams> metricParams = countPerSourceLocation.keySet().stream()
-				.map(this::getMetricParams)
-				.collect(Collectors.toList());
-
-
-        List<List<StatementSourceLocation>> metricsResult =
-                metricParams.stream()
+        List<StatementSourceLocation> aggregatedResult =
+                countPerSourceLocation.keySet().stream()
+                        .map(this::getMetricParams)
                         .map(params -> metrics.stream()
                                 .map(metric -> {
                                     StatementSourceLocation current =
-                                            new StatementSourceLocation(metric, params.getSourceLocation());
+                                            new StatementSourceLocation(
+                                                    metric,
+                                                    params.getSourceLocation()
+                                            );
 
                                     current.setEf(params.getEf());
                                     current.setEp(params.getEp());
@@ -101,27 +100,26 @@ public class CocoSpoonEngineFaultLocalizer {
 
                                     return current;
                                 }).collect(Collectors.toList())
-                        ).collect(Collectors.toList());
+                        )
+                        .filter(list -> !list.isEmpty())
+                        .map(params -> {
+                            /* TODO: Hier den Vektor normalisieren:
+                                params ist der Vektor der einzelnen Ergebnisse. Er ist der
+                                Länge der Metriken, also bei 3 Metriken, ist params der Länge 3.
+                                Man kommt so an die suspiciousness dran:
+                                params.get(0).getSuspiciousness();
+                             */
 
-        List<StatementSourceLocation> aggregatedResult = metricsResult.stream()
-                .filter(list -> !list.isEmpty())
-                .map(params -> {
-                    /* TODO: Hier den Vektor normalisieren:
-                        params ist der Vektor der einzelnen Ergebnisse. Er ist der
-                        Länge der Metriken, also bei 3 Metriken, ist params der Länge 3.
-                        Man kommt so an die suspiciousness dran:
-                        params.get(0).getSuspiciousness();
-                     */
+                            // TODO: hier z.B. das Ergebnis speichern
+                            double result = 0d;
 
-                    // TODO: hier z.B. das Ergebnis speichern
-                    double result = 0d;
+                            IdentityMetric resultMetric = new IdentityMetric(result);
+                            /* since the list is not empty and all the items share the same
+                                SourceLocation, it is safe to just use the first entry
+                             */
+                            return new StatementSourceLocation(resultMetric, params.get(0).getLocation());
+                        }).collect(Collectors.toList());
 
-                    IdentityMetric resultMetric = new IdentityMetric(result);
-                    /* since the list is not empty and all the items share the same
-                        SourceLocation, it is safe to just use the first entry
-                     */
-                    return new StatementSourceLocation(resultMetric, params.get(0).getLocation());
-                }).collect(Collectors.toList());
 
         statements.addAll(aggregatedResult);
 		statements.sort((o1, o2) -> Double.compare(o2.getSuspiciousness(), o1.getSuspiciousness()));
