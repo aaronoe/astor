@@ -109,10 +109,25 @@ public class CocoSpoonEngineFaultLocalizer {
                                 Man kommt so an die suspiciousness dran:
                                 params.get(0).getSuspiciousness();
                              */
+                            /*hier Skalarprodukt zwischen Ergebnisvektor der Metriken und dem "verdaechtigsten" Vektor (1...1)
+							berechnen. wird benoetigt fuer Cosinus-Aehnlichkeit zwischen diesen beiden Vektoren
+                            die Euklidischen Abstand beider Vektoren errechnen sqrt(sum(ai*ai))
+							Berechnung der Kosinusaehnlichkeit der beiden Vektoren,
+							((Skalarprodukt)/(euklidAbstand1*euklidAbstand2)), Ergebnis->1 => verdaechtigeres Ergebnis
+							*/
+							double result;
+							double dotProduct = 0d;
+							double euclidParams = 0d;
+							double euclidMostSusp = params.size();
+							for (StatementSourceLocation param : params) {
+								double suspiciousness = param.getSuspiciousness() < 0 ? 0 : param.getSuspiciousness();
+								dotProduct += suspiciousness;
+								euclidParams += suspiciousness * suspiciousness;
+							}
+							euclidParams = Math.sqrt(euclidParams);
+							euclidMostSusp = Math.sqrt(euclidMostSusp);
 
-                            // TODO: hier z.B. das Ergebnis speichern
-                            double result = 0d;
-
+							result = dotProduct / (euclidParams * euclidMostSusp);
                             IdentityMetric resultMetric = new IdentityMetric(result);
                             /* since the list is not empty and all the items share the same
                                 SourceLocation, it is safe to just use the first entry
