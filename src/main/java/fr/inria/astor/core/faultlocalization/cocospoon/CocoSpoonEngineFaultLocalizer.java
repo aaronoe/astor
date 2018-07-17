@@ -1,27 +1,19 @@
 package fr.inria.astor.core.faultlocalization.cocospoon;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.junit.Test;
-
+import fr.inria.astor.core.faultlocalization.cocospoon.code.MetricParams;
 import fr.inria.astor.core.faultlocalization.cocospoon.code.SourceLocation;
 import fr.inria.astor.core.faultlocalization.cocospoon.code.StatementSourceLocation;
+import fr.inria.astor.core.faultlocalization.cocospoon.metrics.IdentityMetric;
 import fr.inria.astor.core.faultlocalization.cocospoon.metrics.Metric;
-import fr.inria.astor.core.faultlocalization.cocospoon.testrunner.TestCase;
-import fr.inria.astor.core.faultlocalization.cocospoon.testrunner.TestCasesListener;
-import fr.inria.astor.core.faultlocalization.cocospoon.testrunner.TestResult;
-import fr.inria.astor.core.faultlocalization.cocospoon.testrunner.TestResultImpl;
-import fr.inria.astor.core.faultlocalization.cocospoon.testrunner.TestSuiteExecution;
+import fr.inria.astor.core.faultlocalization.cocospoon.testrunner.*;
 import fr.inria.astor.core.setup.ProjectRepairFacade;
 import instrumenting._Instrumenting;
+import org.junit.Test;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by bdanglot on 10/3/16.
@@ -30,14 +22,14 @@ public class CocoSpoonEngineFaultLocalizer {
 
 	protected Map<SourceLocation, List<TestResult>> countPerSourceLocation;
 
-	private final Metric metric;
+	private final List<Metric> metrics;
 	protected int nbSucceedTest;
 	protected int nbFailingTest;
 	protected Map<String, Boolean> resultsPerNameOfTest ;
 	protected List<StatementSourceLocation> statements;
 
-	public CocoSpoonEngineFaultLocalizer(Metric metric) {
-		this.metric = metric;
+	public CocoSpoonEngineFaultLocalizer(List<Metric> metrics) {
+		this.metrics = metrics;
 		this.statements = new ArrayList<>();
 	}
 
@@ -48,10 +40,10 @@ public class CocoSpoonEngineFaultLocalizer {
 		Map<String, Map<SourceLocation, Boolean>> linesExecutedPerTestNames = new HashMap<>();
 		nbFailingTest = 0;
 		nbSucceedTest = 0;
-		for (int i = 0; i < testClasses.length; i++) {
+		for (String testClass: testClasses) {
 			try {
-				for (String methodName : getTestMethods(cl.loadClass(testClasses[i]))) {
-					String testMethod = testClasses[i] + "#" + methodName;
+				for (String methodName: getTestMethods(cl.loadClass(testClass))) {
+					String testMethod = testClass + "#" + methodName;
 					TestSuiteExecution.runTest(testMethod, cl, listener);
 					// Since we executed one test at the time, the listener
 					// contains one and only one TestCase
@@ -71,35 +63,100 @@ public class CocoSpoonEngineFaultLocalizer {
 		this.buildTestResultPerSourceLocation(resultsPerNameOfTest, linesExecutedPerTestNames);
 	}
 
-	private void sortBySuspiciousness() {
-		for (SourceLocation sourceLocation : this.countPerSourceLocation.keySet()) {
-			StatementSourceLocation current = new StatementSourceLocation(this.metric, sourceLocation);
-			int ef = 0;
-			int ep = 0;
-			for (TestResult results : this.countPerSourceLocation.get(sourceLocation)) {
-				if (results.isSuccessful())
-					ep++;
-				else
-					ef++;
-			}
-			current.setNf(nbFailingTest - ef);
-			current.setNp(nbSucceedTest - ep);
-			current.setEp(ep);
-			current.setEf(ef);
-			statements.add(current);
+	private MetricParams getMetricParams(SourceLocation sourceLocation) {
+		int ef = 0;
+		int ep = 0;
+		for (TestResult results : this.countPerSourceLocation.get(sourceLocation)) {
+			if (results.isSuccessful())
+				ep++;
+			else
+				ef++;
 		}
-		Collections.sort(statements, new Comparator<StatementSourceLocation>() {
-			@Override
-			public int compare(StatementSourceLocation o1, StatementSourceLocation o2) {
-				return Double.compare(o2.getSuspiciousness(), o1.getSuspiciousness());
-			}
-		});
+
+		return new MetricParams(
+				sourceLocation, ef, ep,
+				nbFailingTest - ef,
+				nbSucceedTest - ep
+		);
+	}
+
+	List<StatementSourceLocation> getStatementsSortedBySuspiciousness() {
+
+        List<StatementSourceLocation> aggregatedResult =
+                countPerSourceLocation.keySet().stream()
+                        .map(this::getMetricParams)
+                        .map(params -> metrics.stream()
+                                .map(metric -> {
+                                    StatementSourceLocation current =
+                                            new StatementSourceLocation(
+                                                    metric,
+                                                    params.getSourceLocation()
+                                            );
+
+                                    current.setEf(params.getEf());
+                                    current.setEp(params.getEp());
+                                    current.setNf(params.getNf());
+                                    current.setNp(params.getNp());
+
+                                    return current;
+                                }).collect(Collectors.toList())
+                        )
+                        .filter(list -> !list.isEmpty())
+                        .map(params -> {
+                            /* TODO: Hier den Vektor normalisieren:
+                                params ist der Vektor der einzelnen Ergebnisse. Er ist der
+                                Länge der Metriken, also bei 3 Metriken, ist params der Länge 3.
+                                Man kommt so an die suspiciousness dran:
+                                params.get(0).getSuspiciousness();
+                             */
+                            /*hier Skalarprodukt zwischen Ergebnisvektor der Metriken und dem "verdaechtigsten" Vektor (1...1)
+							berechnen. wird benoetigt fuer Cosinus-Aehnlichkeit zwischen diesen beiden Vektoren
+                            die Euklidischen Abstand beider Vektoren errechnen sqrt(sum(ai*ai))
+							Berechnung der Kosinusaehnlichkeit der beiden Vektoren,
+							((Skalarprodukt)/(euklidAbstand1*euklidAbstand2)), Ergebnis->1 => verdaechtigeres Ergebnis
+							*/
+							double result;
+							double dotProduct = 0d;
+							double euclidParams = 0d;
+							double euclidMostSusp = params.size();
+							for (StatementSourceLocation param : params) {
+								double suspiciousness = param.getSuspiciousness() < 0 ? 0 : param.getSuspiciousness();
+								dotProduct += suspiciousness;
+								euclidParams += suspiciousness * suspiciousness;
+							}
+							euclidParams = Math.sqrt(euclidParams);
+							euclidMostSusp = Math.sqrt(euclidMostSusp);
+
+							if(euclidParams > 0 && euclidMostSusp > 0) {
+								result = dotProduct / (euclidParams * euclidMostSusp);
+							}
+							else{
+								result=0;
+							}
+							/*reduce all similarities less than 0.5 cos-similarity down to 0 due to performance issues
+							* and for weighting reasons
+							*/
+							if (result < 0.5) {
+								result = 0;
+							}
+                            IdentityMetric resultMetric = new IdentityMetric(result);
+                            /* since the list is not empty and all the items share the same
+                                SourceLocation, it is safe to just use the first entry
+                             */
+                            return new StatementSourceLocation(resultMetric, params.get(0).getLocation());
+                        }).collect(Collectors.toList());
+
+
+        statements.addAll(aggregatedResult);
+		statements.sort((o1, o2) -> Double.compare(o2.getSuspiciousness(), o1.getSuspiciousness()));
 
 		LinkedHashMap<SourceLocation, List<TestResult>> map = new LinkedHashMap<>();
 		for (StatementSourceLocation source : statements) {
 			map.put(source.getLocation(), this.countPerSourceLocation.get(source.getLocation()));
 		}
 		this.countPerSourceLocation = map;
+
+		return statements;
 	}
 
 	/**
@@ -167,7 +224,7 @@ public class CocoSpoonEngineFaultLocalizer {
 	}
 
 	public Map<SourceLocation, List<TestResult>> getTestListPerStatement() {
-		sortBySuspiciousness();
+		getStatementsSortedBySuspiciousness();
 
 		return this.countPerSourceLocation;
 	}
