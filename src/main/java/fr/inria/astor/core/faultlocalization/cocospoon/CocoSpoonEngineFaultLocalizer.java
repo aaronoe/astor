@@ -127,8 +127,12 @@ public class CocoSpoonEngineFaultLocalizer {
 							euclidParams = Math.sqrt(euclidParams);
 							euclidMostSusp = Math.sqrt(euclidMostSusp);
 
-							result = dotProduct / (euclidParams * euclidMostSusp);
-
+							if(euclidParams > 0 && euclidMostSusp > 0) {
+								result = dotProduct / (euclidParams * euclidMostSusp);
+							}
+							else{
+								result=0;
+							}
 							/*reduce all similarities less than 0.5 cos-similarity down to 0 due to performance issues
 							* and for weighting reasons
 							*/
