@@ -1,22 +1,12 @@
 package fr.inria.astor.core.faultlocalization.cocospoon;
 
-import java.io.File;
-import java.net.MalformedURLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import org.apache.log4j.Logger;
-
 import fil.iagl.opl.cocospoon.processors.WatcherProcessor;
 import fr.inria.astor.core.entities.ProgramVariant;
 import fr.inria.astor.core.faultlocalization.FaultLocalizationResult;
 import fr.inria.astor.core.faultlocalization.FaultLocalizationStrategy;
 import fr.inria.astor.core.faultlocalization.cocospoon.code.SourceLocation;
 import fr.inria.astor.core.faultlocalization.cocospoon.code.StatementSourceLocation;
-import fr.inria.astor.core.faultlocalization.cocospoon.metrics.Ochiai;
+import fr.inria.astor.core.faultlocalization.cocospoon.metrics.*;
 import fr.inria.astor.core.faultlocalization.cocospoon.testrunner.TestResult;
 import fr.inria.astor.core.faultlocalization.entity.SuspiciousCode;
 import fr.inria.astor.core.manipulation.MutationSupporter;
@@ -26,10 +16,19 @@ import fr.inria.astor.core.manipulation.bytecode.entities.CompilationResult;
 import fr.inria.astor.core.setup.ConfigurationProperties;
 import fr.inria.astor.core.setup.ProjectRepairFacade;
 import fr.inria.astor.util.Converters;
+import org.apache.log4j.Logger;
 import spoon.processing.ProcessInterruption;
 import spoon.processing.ProcessingManager;
 import spoon.reflect.declaration.CtType;
 import spoon.support.RuntimeProcessingManager;
+
+import java.io.File;
+import java.net.MalformedURLException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 
@@ -58,8 +57,15 @@ public class CocoFaultLocalization implements FaultLocalizationStrategy {
 		BytecodeClassLoader customClassLoader = createClassLoader(cresults, project);
 
 		// call cocoa with tests
+		List<Metric> metrics = new ArrayList<>(3);
+		metrics.add(new Tarantula());
+		metrics.add(new Anderberg());
+		metrics.add(new Ochiai());
 
-		CocoSpoonEngineFaultLocalizer coco4Astor = new CocoSpoonEngineFaultLocalizer(new Ochiai());
+		Metric combinedMetric = new CombinedMetric(metrics);
+
+		CocoSpoonEngineFaultLocalizer coco4Astor =
+				new CocoSpoonEngineFaultLocalizer(combinedMetric);
 		// Get Test
 		List<String> testregression = project.getProperties().getRegressionTestCases();
 		testregression.toArray(new String[0]);
