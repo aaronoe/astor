@@ -128,6 +128,14 @@ public class CocoSpoonEngineFaultLocalizer {
 							euclidMostSusp = Math.sqrt(euclidMostSusp);
 
 							result = dotProduct / (euclidParams * euclidMostSusp);
+
+							/*reduce all similarities less than 0.5 cos-similarity down to 0 due to performance issues
+							* and for weighting reasons
+							*/
+							if(result<0.5)
+							{
+								result=0;
+							}
                             IdentityMetric resultMetric = new IdentityMetric(result);
                             /* since the list is not empty and all the items share the same
                                 SourceLocation, it is safe to just use the first entry
