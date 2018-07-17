@@ -80,6 +80,15 @@ public class CocoFaultLocalization implements FaultLocalizationStrategy {
 		List<? extends StatementSourceLocation> suspiciousStatements =
 				coco4Astor.getStatementsSortedBySuspiciousness();
 
+		System.out.println();
+		System.out.println("----------------------------------");
+		System.out.println("Coco LOG: ");
+		suspiciousStatements.forEach(item -> {
+			System.out.println(item.getLocation().getRootClassName() + " - " + item.getLocation().getLineNumber() + " : " + item.getSuspiciousness());
+		});
+		System.out.println("----------------------------------");
+		System.out.println();
+
 		MutationSupporter.cleanFactory();
 
 		Double thr = ConfigurationProperties.getPropertyDouble("flthreshold");

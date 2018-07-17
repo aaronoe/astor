@@ -1,13 +1,5 @@
 package fr.inria.astor.test.repair.evaluation.extensionpoints.faultlocalization;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
-
 import fr.inria.astor.core.entities.ModificationPoint;
 import fr.inria.astor.core.entities.ProgramVariant;
 import fr.inria.astor.core.entities.SuspiciousModificationPoint;
@@ -15,6 +7,7 @@ import fr.inria.astor.core.faultlocalization.cocospoon.CocoFaultLocalization;
 import fr.inria.astor.core.faultlocalization.cocospoon.CocoSpoonEngineFaultLocalizer;
 import fr.inria.astor.core.faultlocalization.cocospoon.code.SourceLocation;
 import fr.inria.astor.core.faultlocalization.cocospoon.code.StatementSourceLocation;
+import fr.inria.astor.core.faultlocalization.cocospoon.metrics.Metric;
 import fr.inria.astor.core.faultlocalization.cocospoon.metrics.Ochiai;
 import fr.inria.astor.core.faultlocalization.cocospoon.testrunner.TestResult;
 import fr.inria.astor.core.manipulation.MutationSupporter;
@@ -24,7 +17,15 @@ import fr.inria.astor.core.setup.ProjectRepairFacade;
 import fr.inria.astor.test.repair.evaluation.regression.MathCommandsTests;
 import fr.inria.main.CommandSummary;
 import fr.inria.main.evolution.AstorMain;
+import org.junit.Assert;
+import org.junit.Ignore;
+import org.junit.Test;
 import spoon.reflect.declaration.CtType;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 
@@ -82,7 +83,9 @@ public class CocoAstorFaulLocalizationTest {
 		Assert.assertNotNull(customClassLoader);
 		//
 		//
-		CocoSpoonEngineFaultLocalizer coco4Astor = new CocoSpoonEngineFaultLocalizer(new Ochiai());
+		List<Metric> metrics = new ArrayList<>();
+		metrics.add(new Ochiai());
+		CocoSpoonEngineFaultLocalizer coco4Astor = new CocoSpoonEngineFaultLocalizer(metrics);
 		List<String> testregression = project.getProperties().getRegressionTestCases();
 		testregression.toArray(new String[0]);
 		coco4Astor.runTests(testregression.toArray(new String[0]), customClassLoader, project);
