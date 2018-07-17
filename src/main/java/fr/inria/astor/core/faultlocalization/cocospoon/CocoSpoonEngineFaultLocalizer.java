@@ -132,9 +132,8 @@ public class CocoSpoonEngineFaultLocalizer {
 							/*reduce all similarities less than 0.5 cos-similarity down to 0 due to performance issues
 							* and for weighting reasons
 							*/
-							if(result<0.5)
-							{
-								result=0;
+							if (result < 0.5) {
+								result = 0;
 							}
                             IdentityMetric resultMetric = new IdentityMetric(result);
                             /* since the list is not empty and all the items share the same
