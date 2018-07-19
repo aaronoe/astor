@@ -3,6 +3,9 @@ package fr.inria.astor.core.faultlocalization.cocospoon.metrics;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Aggregates a list of metrics using the cosine similarity
+ */
 public class CombinedMetric implements Metric {
 
     private List<Metric> metrics;
@@ -22,7 +25,7 @@ public class CombinedMetric implements Metric {
                 .map(item -> item.value(ef, ep, nf, np))
                 .collect(Collectors.toList());
 
-        for (Double suspValue: metricResults) {
+        for (Double suspValue : metricResults) {
             suspValue = suspValue < 0 ? 0 : suspValue;
             dotProduct += suspValue;
             euclidParams += suspValue * suspValue;
